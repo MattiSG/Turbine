@@ -215,21 +215,22 @@ class Parser2 extends Base{
 				$debug['type'] = 'Reset';
 				$debug['stack'] = 'Reset';
 			} else { // Else parse the line
+				$trimmedLine = trim($line);
 				// Line begins with "@media" = parse this as a @media-line
-				if (substr(trim($line), 0, 6) == '@media') {
+				if (substr($trimmedLine, 0, 4) == '@css') { // Line begins with "@css" = Parse as literal css
+					$this->parse_css_line($line);
+					$this->selector_stack = array();
+					$debug['type'] = 'CSS';
+					$debug['stack'] = 'Reset';
+				} elseif (substr($trimmedLine, 0, 6) == '@media') {
 					$this->parse_media_line($line);
 					$this->selector_stack = array();
 					$debug['type'] = 'Media';
 					$debug['stack'] = 'Reset';
-				} elseif (substr(trim($line), 0, 7) == '@import') { // Line begins with "@import" = Parse @import rule
+				} elseif (substr($trimmedLine, 0, 7) == '@import') { // Line begins with "@import" = Parse @import rule
 					$this->parse_import_line($line);
 					$this->selector_stack = array();
 					$debug['type'] = 'Import';
-					$debug['stack'] = 'Reset';
-				} elseif (substr(trim($line), 0, 4) == '@css') { // Line begins with "@css" = Parse as literal css
-					$this->parse_css_line($line);
-					$this->selector_stack = array();
-					$debug['type'] = 'CSS';
 					$debug['stack'] = 'Reset';
 				} else { // Else parse normal line
 					// Next line is indented = parse this as a selector
