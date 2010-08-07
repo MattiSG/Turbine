@@ -1,10 +1,12 @@
 <?php
 
 /**
- * This file is part of Turbine
+ * This file is part of MattiSG's Turbine, forked from SirPepe's Turbine
+ * http://github.com/MattiSG/Turbine
  * http://github.com/SirPepe/Turbine
  * 
- * Copyright Peter Kröner
+ *@author	Peter Kröner
+ *@author	Matti Schneider-Ghibaudo
  * Licensed under GNU LGPL 3, see license.txt or http://www.gnu.org/licenses/
  */
 
@@ -125,7 +127,7 @@ class Parser2 extends Base{
 	 * Creates and returns a new CSS Parser object
 	 * @return object $this The CSS Parser object
 	 */
-	public static function factory(){
+	public static function factory() {
 		return new Parser2();
 	}
 
@@ -133,7 +135,7 @@ class Parser2 extends Base{
 	/**
 	 * Constructor
 	 */
-	public function __construct(){
+	public function __construct() {
 		parent::__construct();
 	}
 
@@ -145,12 +147,11 @@ class Parser2 extends Base{
 	 * @param bool $overwrite overwrite already loaded css or append the new string?
 	 * @return object $this The CSS Parser object
 	 */
-	public function load_string($string, $overwrite = false){
+	public function load_string($string, $overwrite = false) {
 		$lines = explode("\n", $string);
-		if($overwrite){
+		if ($overwrite) {
 			$this->code = $lines;
-		}
-		else{
+		} else {
 			$this->code = array_merge($this->code, $lines);
 		}
 		return $this;
@@ -158,29 +159,28 @@ class Parser2 extends Base{
 
 
 	/**
+	 * load_files
+	 * Loads a number of files
+	 * @param string $files File(s) to load, seperated by ;
+	 * @return object $this The CSS Parser object
+	 */
+	public function load_files($files) {
+		$files = explode(';', $files);
+		foreach ($files as $file)
+			$this->load_file($file, false);
+		return $this;
+	}
+	
+	
+	/**
 	 * load_file
 	 * Loads a file
 	 * @param string $file The css files to load
 	 * @param bool $overwrite overwrite already loaded css or append the new string?
 	 * @return object $this The CSS Parser object
 	 */
-	public function load_file($file, $overwrite = false){
+	public function load_file($file, $overwrite = false) {
 		$this->load_string(file_get_contents($file), $overwrite);
-		return $this;
-	}
-
-
-	/**
-	 * load_files
-	 * Loads a number of files
-	 * @param string $files File(s) to load, sepperated by ;
-	 * @return object $this The CSS Parser object
-	 */
-	public function load_files($files){
-		$files = explode(';', $files);
-		foreach($files as $file){
-			$this->load_file($file, false);
-		}
 		return $this;
 	}
 
@@ -190,61 +190,54 @@ class Parser2 extends Base{
 	 * Reads the loaded css line by line into $this->parsed
 	 * @return object $this The CSS Parser object
 	 */
-	public function parse(){
+	public function parse() {
 		// Preprocess the code and get the indention char(s)
 		$this->preprocess();
 		$this->set_indention_char();
 		// Loop through the lines
 		$loc = count($this->code);
-		for($i = 0; $i < $loc; $i++){
+		for($i = 0; $i < $loc; $i++) {
 			$debug = array();
 			$this->token = '';
 			$line = $this->code[$i];
+			if (! trim($line)) //ignore empty lines
+				continue;
+				
 			$level = $this->get_indention_level($line); // Get this line's indention level
 			$debug['line'] = $line;
-			if(isset($this->code[$i + 1])){
+			if (isset($this->code[$i + 1])) {
 				$nextline = $this->code[$i + 1];
 				$nextlevel = $this->get_indention_level($nextline); // Get the next line's indention level
 			}
 			// If the current line is empty, ignore it and reset the selector stack
-			if($line == ''){
+			if ($line == '') {
 				$this->selector_stack = array();
 				$debug['type'] = 'Reset';
 				$debug['stack'] = 'Reset';
-			}
-			// Else parse the line
-			else{
+			} else { // Else parse the line
 				// Line begins with "@media" = parse this as a @media-line
-				if(substr(trim($line), 0, 6) == '@media'){
+				if (substr(trim($line), 0, 6) == '@media') {
 					$this->parse_media_line($line);
 					$this->selector_stack = array();
 					$debug['type'] = 'Media';
 					$debug['stack'] = 'Reset';
-				}
-				// Line begins with "@import" = Parse @import rule
-				elseif(substr(trim($line), 0, 7) == '@import'){
+				} elseif (substr(trim($line), 0, 7) == '@import') { // Line begins with "@import" = Parse @import rule
 					$this->parse_import_line($line);
 					$this->selector_stack = array();
 					$debug['type'] = 'Import';
 					$debug['stack'] = 'Reset';
-				}
-				// Line begins with "@css" = Parse as literal css
-				elseif(substr(trim($line), 0, 4) == '@css'){
+				} elseif (substr(trim($line), 0, 4) == '@css') { // Line begins with "@css" = Parse as literal css
 					$this->parse_css_line($line);
 					$this->selector_stack = array();
 					$debug['type'] = 'CSS';
 					$debug['stack'] = 'Reset';
-				}
-				// Else parse normal line
-				else{
+				} else { // Else parse normal line
 					// Next line is indented = parse this as a selector
-					if($nextline != '' && $nextlevel > $level){
+					if ($nextline != '' && $nextlevel > $level) {
 						$this->parse_selector_line($line, $level);
 						$debug['type'] = 'Selector';
 						$debug['stack'] = $this->selector_stack;
-					}
-					// Else parse as a property-value-pair
-					else{
+					} else { // Else parse as a property-value-pair
 						$this->parse_property_line($line);
 						$this->reset_current_property();
 						$debug['type'] = 'Property/Value';
@@ -253,7 +246,7 @@ class Parser2 extends Base{
 				}
 			}
 			// If the next line is outdented, slice the selector stack accordingly
-			if($nextline != '' && $nextlevel < $level){
+			if ($nextline != '' && $nextlevel < $level) {
 				$this->selector_stack = array_slice($this->selector_stack, 0, $nextlevel);
 				$this->current['se'] = end($this->selector_stack);
 			}
@@ -263,7 +256,7 @@ class Parser2 extends Base{
 			unset($debug);
 		}
 		// Dump $this->parsed when configured to do so
-		if($this->debug){
+		if ($this->debug) {
 			print_r($this->parsed);
 		}
 		return $this;
@@ -276,8 +269,8 @@ class Parser2 extends Base{
 	 * @param string $char The whitespace char(s) used for indention
 	 * @return void
 	 */
-	public function set_indention_char($char = null){
-		if(!$char){
+	public function set_indention_char($char = null) {
+		if (!$char) {
 			$char = Parser2::get_indention_char($this->code);
 		}
 		$this->indention_char = $char;
@@ -290,14 +283,14 @@ class Parser2 extends Base{
 	 * @param array $lines The code in question
 	 * @return string $matches[1] The whitespace char(s) used for indention
 	 */
-	public static function get_indention_char($lines){
+	public static function get_indention_char($lines) {
 		$linecount = count($lines);
-		for($i = 0; $i < $linecount; $i++){
+		for($i = 0; $i < $linecount; $i++) {
 			$line = $lines[$i];
 			$nextline = (isset($lines[$i + 1])) ? $lines[$i + 1] : '';
 			// If the line and the following line are not empty and not @rules, find the whitespace used for indention
-			if($line != '' && trim($nextline) != '' && preg_match('/^([\s]+)(.*?)$/', $nextline, $matches)){
-				if(count($matches) == 3 && strlen($matches[1]) > 0 && $matches[2]{0} != '@'){
+			if ($line != '' && trim($nextline) != '' && preg_match('/^([\s]+)(.*?)$/', $nextline, $matches)) {
+				if (count($matches) == 3 && strlen($matches[1]) > 0 && $matches[2]{0} != '@') {
 					return $matches[1];
 				}
 			}
@@ -310,7 +303,7 @@ class Parser2 extends Base{
 	 * Clean up the code
 	 * @return void
 	 */
-	protected function preprocess(){
+	protected function preprocess() {
 		$this->preprocess_clean();
 		$this->preprocess_concatenate_selectors();
 	}
@@ -321,29 +314,25 @@ class Parser2 extends Base{
 	 * Strip comment lines and whitespace
 	 * @return void
 	 */
-	private function preprocess_clean(){
+	private function preprocess_clean() {
 		$processed = array();   // The remaining, cleaned up lines
 		$comment_state = false; // The block comment state
 		$previous_line = '';    // The line before the line being processed
 		$loc = count($this->code);
-		for($i = 0; $i < $loc; $i++){
+		for($i = 0; $i < $loc; $i++) {
 			// Handle block comment lines
-			if(trim($this->code[$i]) == '--'){
+			if (trim($this->code[$i]) == '--') {
 				$comment_state = ($comment_state) ? false : true;
-			}
-			// Handle normal lines
-			elseif(!$comment_state){
+			} elseif (!$comment_state) { // Handle normal lines
 				// Ignore lines containing nothing but a comment
-				if(!preg_match('~^[\s]*//.*?$~', $this->code[$i])){
+				if (!preg_match('~^[\s]*//.*?$~', $this->code[$i])) {
 					// Lines containing non-whitespace
-					if(preg_match('[\S]', $this->code[$i])){
+					if (preg_match('[\S]', $this->code[$i])) {
 						$processed[] = $this->code[$i];
 						$previous_line = $this->code[$i];
-					}
-					// Lines with nothing but whitespace
-					else{
+					} else { // Lines with nothing but whitespace
 						// Only add this line if the previous one had any non-whitespace
-						if($previous_line != ''){
+						if ($previous_line != '') {
 							$processed[] = '';
 							$previous_line = '';
 						}
@@ -360,13 +349,13 @@ class Parser2 extends Base{
 	 * Concatenates multiline selectors
 	 * @return void
 	 */
-	private function preprocess_concatenate_selectors(){
+	private function preprocess_concatenate_selectors() {
 		$processed = array();
 		$loc = count($this->code);
-		for($i = 0; $i < $loc; $i++){
+		for($i = 0; $i < $loc; $i++) {
 			$line = $this->code[$i];
-			if($line != ''){
-				while(substr($line, -1) == ','){
+			if ($line != '') {
+				while(substr($line, -1) == ',') {
 					$line .= ' '.$this->code[++$i];
 				}
 			}
@@ -382,9 +371,9 @@ class Parser2 extends Base{
 	 * @param string $line The line to get the indention level for
 	 * @return int $level The indention level
 	 */
-	public function get_indention_level($line){
+	public function get_indention_level($line) {
 		$level = 0;
-		if(substr($line, 0, strlen($this->indention_char)) == $this->indention_char){
+		if (substr($line, 0, strlen($this->indention_char)) == $this->indention_char) {
 			$level = 1 + $this->get_indention_level(substr($line, strlen($this->indention_char)));
 		}
 		return $level;
@@ -397,17 +386,16 @@ class Parser2 extends Base{
 	 * @param string $char A single char
 	 * @return void
 	 */
-	protected function switch_string_state($char){
+	protected function switch_string_state($char) {
 		$strings = array('"', "'", '(');
-		if($this->state != 'st'){
-			if(in_array($char, $strings)){ // Enter string state
+		if ($this->state != 'st') {
+			if (in_array($char, $strings)) { // Enter string state
 				$this->prev_state = $this->state;
 				$this->string_state = $char;
 				$this->state = 'st';
 			}
-		}
-		else{
-			if($char == $this->string_state || ($char == ')' && $this->string_state == '(')){ // Leave string state
+		} else {
+			if ($char == $this->string_state || ($char == ')' && $this->string_state == '(')) { // Leave string state
 				$this->string_state = null;
 				$this->state = $this->prev_state;
 			}
@@ -421,16 +409,16 @@ class Parser2 extends Base{
 	 * @param string $line A line containing an @media switch
 	 * @return void
 	 */
-	protected function parse_media_line($line){
+	protected function parse_media_line($line) {
 		$this->current['me'] = '';
 		$this->current['se'] = '';
 		$this->current['pr'] = '';
 		$this->current['va'] = '';
 		$line = trim($line);
 		$len = strlen($line);
-		for($i = 0; $i < $len; $i++ ){
+		for($i = 0; $i < $len; $i++ ) {
 			$this->switch_string_state($line{$i});
-			if($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/'){     // Break on comment
+			if ($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/') {     // Break on comment
 				break;
 			}
 			$this->token .= $line{$i};
@@ -447,12 +435,12 @@ class Parser2 extends Base{
 	 * @param int $level The lines' indention level
 	 * @return void
 	 */
-	protected function parse_selector_line($line, $level){
+	protected function parse_selector_line($line, $level) {
 		$line = trim($line);
 		$len = strlen($line);
-		for($i = 0; $i < $len; $i++ ){
+		for($i = 0; $i < $len; $i++ ) {
 			$this->switch_string_state($line{$i});
-			if($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/'){ // Break on comment
+			if ($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/') { // Break on comment
 				break;
 			}
 			$this->token .= $line{$i};
@@ -462,7 +450,7 @@ class Parser2 extends Base{
 		// Combine selector with the nesting stack
 		$selector = $this->merge_selectors($this->array_get_previous($this->selector_stack, $level), $selector);
 		// Increase font-face index if this is an @font-face element
-		if($selector == '@font-face'){
+		if ($selector == '@font-face') {
 			$this->current['fi']++;
 		}
 		// Use as current selector
@@ -480,20 +468,18 @@ class Parser2 extends Base{
 	 * @param array $child
 	 * @return array $selectors
 	 */
-	protected function merge_selectors($parent, $child){
+	protected function merge_selectors($parent, $child) {
 		// If the parent is empty, don't do anything to the child
-		if(empty($parent)){
+		if (empty($parent)) {
 			return $child;
-		}
-		// Else combine the selectors
-		else{
+		} else { // Else combine the selectors
 			$parent = $this->tokenize($parent, ',');
 			$child = $this->tokenize($child, ',');
 			// Merge the tokenized selectors
 			$selectors = array();
-			foreach($parent as $p){
+			foreach ($parent as $p) {
 				$selector = array();
-				foreach($child as $c){
+				foreach ($child as $c) {
 					$selector[] = $p.' '.$c;
 				}
 				$selectors[] = $selector;
@@ -509,10 +495,10 @@ class Parser2 extends Base{
 	 * @param array $selectors A list of selectors
 	 * @return string The combined selector
 	 */
-	protected function implode_selectors($selectors){
+	protected function implode_selectors($selectors) {
 		$num = count($selectors);
-		for($i = 0; $i < $num; $i++){
-			if(is_array($selectors[$i])){
+		for($i = 0; $i < $num; $i++) {
+			if (is_array($selectors[$i])) {
 				$selectors[$i] = $this->implode_selectors($selectors[$i]);
 			}
 		}
@@ -527,13 +513,13 @@ class Parser2 extends Base{
 	 * @param string $line A line containing @import
 	 * @return void
 	 */
-	protected function parse_import_line($line){
+	protected function parse_import_line($line) {
 		$line = trim($line);
 		$line = substr($line, 7); // Strip "@import"
 		$len = strlen($line);
-		for($i = 0; $i < $len; $i++){
+		for($i = 0; $i < $len; $i++) {
 			$this->switch_string_state($line{$i});
-			if($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/'){ // Break on comment
+			if ($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/') { // Break on comment
 				break;
 			}
 			$this->token .= $line{$i};
@@ -547,7 +533,7 @@ class Parser2 extends Base{
 	 * @param string $line
 	 * @return void
 	 */
-	protected function parse_css_line($line){
+	protected function parse_css_line($line) {
 		$line = trim($line);
 		$line = substr($line, 4);                   // Strip "@css"
 		$selector = '@css-'.$this->current['ci']++; // Build the selector using the @css-Index
@@ -563,27 +549,27 @@ class Parser2 extends Base{
 	 * @param string $line A line containing one (or more) property-value-pairs
 	 * @return void
 	 */
-	protected function parse_property_line($line){
+	protected function parse_property_line($line) {
 		$line = trim($line);
 		$len = strlen($line);
 		$this->state = 'pr';
-		for($i = 0; $i < $len; $i++ ){
+		for($i = 0; $i < $len; $i++ ) {
 			$this->switch_string_state($line{$i});
-			if($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/'){ // Break on comment
-				if(trim($this->token) != ''){
+			if ($this->state != 'st' && $line{$i} == '/' && $line{$i+1} == '/') { // Break on comment
+				if (trim($this->token) != '') {
 					$this->current['va'] = trim($this->token);
 					$this->token = '';
 					$this->merge();
 				}
 				break;
 			}
-			elseif($this->state == 'pr' && $line{$i} == ':'){ // End property state on colon
+			elseif ($this->state == 'pr' && $line{$i} == ':') { // End property state on colon
 				$this->current['pr'] = trim($this->token);
 				$this->state = 'va';
 				$this->token = '';
 			}
-			elseif($i + 1 == $len || ($this->state != 'st' && $line{$i} == ';')){ // End pair on line end or semicolon
-				if($i + 1 == $len && $line{$i} != ';'){
+			elseif ($i + 1 == $len || ($this->state != 'st' && $line{$i} == ';')) { // End pair on line end or semicolon
+				if ($i + 1 == $len && $line{$i} != ';') {
 					$this->token .= $line{$i};
 				}
 				$this->current['va'] = trim($this->token);
@@ -603,23 +589,23 @@ class Parser2 extends Base{
 	 * Merges the current values into $this->parsed
 	 * @return void
 	 */
-	protected function merge(){
+	protected function merge() {
 		// The current values
 		$me = $this->current['me'];
 		$se = $this->current['se'];
 		$pr = $this->current['pr'];
 		$va = $this->current['va'];
 		$fi = $this->current['fi'];
-		if($pr !== '' && $va !== ''){
+		if ($pr !== '' && $va !== '') {
 			// Special destination for @font-face
-			if($se == '@font-face'){
+			if ($se == '@font-face') {
 				$dest =& $this->parsed[$me][$se][$fi][$pr];
 			}
 			else{
 				$dest =& $this->parsed[$me][$se][$pr];
 			}
 			// Set the value array if not aleady present
-			if(!isset($dest)){
+			if (!isset($dest)) {
 				$dest = array();
 			}
 			// Add the value to the destination
@@ -633,7 +619,7 @@ class Parser2 extends Base{
 	 * Empties the current value and property token
 	 * @return void
 	 */
-	private function reset_current_property(){
+	private function reset_current_property() {
 		$this->current['pr'] = '';
 		$this->current['va'] = '';
 	}
@@ -644,11 +630,11 @@ class Parser2 extends Base{
 	 * Check sanity before output. Complain if somthing stupid comes along, but don't stop it - that's the web developer's job
 	 * @return void
 	 */
-	private function check_sanity(){
+	private function check_sanity() {
 		// Loop through the blocks
-		foreach($this->parsed as $block => $content){
+		foreach ($this->parsed as $block => $content) {
 			// Loop through elements
-			foreach($content as $selector => $rules){
+			foreach ($content as $selector => $rules) {
 				$this->check_sanity_filters($selector, $rules);
 			}
 		}
@@ -663,9 +649,9 @@ class Parser2 extends Base{
 	 * @param array $rules The rules to check
 	 * @return void
 	 */
-	private function check_sanity_filters($selector, $rules){
-		if(isset($rules['overflow']) && (isset($rules['filter']) || isset($rules['-ms-filter']))){
-			if($this->get_final_value($rules['overflow'], 'overflow') == 'visible'){
+	private function check_sanity_filters($selector, $rules) {
+		if (isset($rules['overflow']) && (isset($rules['filter']) || isset($rules['-ms-filter']))) {
+			if ($this->get_final_value($rules['overflow'], 'overflow') == 'visible') {
 				$this->report_error('Potential problem: Filters and overflow:visible are present at selector '
 					. $selector . '. Filter may enforce unwanted overflow:hidden in Internet Explorer.');
 			}
@@ -680,48 +666,42 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output The final CSS code
 	 */
-	public function glue($compressed = false){
+	public function glue($compressed = false) {
 		$this->check_sanity();
 		$output = '';
-		// Whitspace characters
+		// Whitespace characters
 		$s = ' ';
 		$t = "\t";
 		$n = "\r\n";
 		// Forget the whitespace if we're compressing
-		if($compressed){
+		if ($compressed) {
 			$s = $t = $n = '';
 		}
 		// Loop through the blocks
-		foreach($this->parsed as $block => $content){
+		foreach ($this->parsed as $block => $content) {
 			$indented = false;
 			// Is current block an @media-block? If so, open the block
 			$media_block = (substr($block, 0, 6) === '@media');
-			if($media_block){
+			if ($media_block) {
 				$output .= $block . $s;
 				$output .= '{' . $n;
 				$indented = true;
 			}
 			// Read contents
-			foreach($content as $selector => $rules){
+			foreach ($content as $selector => $rules) {
 				// @import rules
-				if($selector == '@import'){
+				if ($selector == '@import') {
 					$output .= $this->glue_import($rules, $compressed);
-				}
-				// @font-face rules
-				elseif($selector == '@font-face'){
+				} elseif ($selector == '@font-face') { // @font-face rules
 					$output .= $this->glue_font_face($rules, $compressed);
-				}
-				// @css line
-				elseif(preg_match('/@css-[0-9]+/', $selector)){
+				} elseif (preg_match('/@css-[0-9]+/', $selector)) { // @css line
 					$output .= $this->glue_css($rules, $indented, $compressed);
-				}
-				// Normal css rules
-				else{
+				} else { // Normal css rules
 					$output .= $this->glue_rule($selector, $rules, $indented, $compressed);
 				}
 			}
 			// If @media-block, close block
-			if($media_block){
+			if ($media_block) {
 				$output .= '}' . $n;
 			}
 		}
@@ -736,10 +716,10 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output Formatted CSS
 	 */
-	private function glue_import($imports, $compressed){
+	private function glue_import($imports, $compressed) {
 		$output = '';
 		$n = ($compressed) ? '' : "\r\n";
-		foreach($imports as $import){
+		foreach ($imports as $import) {
 			$semicolon = (substr($import[0], -1) == ';') ? '' : ';';
 			$output .= '@import ' . $import[0] . $semicolon . $n;
 		}
@@ -754,17 +734,17 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output Formatted CSS
 	 */
-	private function glue_font_face($fonts, $compressed){
+	private function glue_font_face($fonts, $compressed) {
 		$output = '';
 		// Whitspace characters
 		$s = ' ';
 		$n = "\r\n";
 		// Forget the whitespace if we're compressing
-		if($compressed){
+		if ($compressed) {
 			$s = $n = '';
 		}
 		// Build the @font-face rules
-		foreach($fonts as $font => $styles){
+		foreach ($fonts as $font => $styles) {
 			$output .= '@font-face'.$s.'{'.$n;
 			$output .= $this->glue_properties($styles, '', $compressed);
 			$output .= '}'.$n;
@@ -781,7 +761,7 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output Formatted CSS
 	 */
-	private function glue_css($contents, $indented, $compressed){
+	private function glue_css($contents, $indented, $compressed) {
 		$value = array_pop($contents['_value']);
 		// Set the indention prefix
 		$prefix = ($indented && !$compressed) ? "\t" : '';
@@ -800,27 +780,27 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output Formatted CSS
 	 */
-	private function glue_rule($selector, $rules, $indented, $compressed){
+	private function glue_rule($selector, $rules, $indented, $compressed) {
 		$output = '';
 		// Whitspace characters
 		$s = ' ';
 		$t = "\t";
 		$n = "\r\n";
 		// Forget the whitespace if we're compressing
-		if($compressed){
+		if ($compressed) {
 			$s = $t = $n = '';
 		}
 		// Set the indention prefix
 		$prefix = ($indented && !$compressed) ? $t : '';
 		// Strip whitespace from selectors when compressing
-		if($compressed){
+		if ($compressed) {
 			$selector = implode(',', $this->tokenize($selector, ','));
 		}
 		// Constuct the selecor
 		$output .= $prefix . $selector . $s;
 		$output .= '{';
 		// Add comments
-		if(isset($rules['_comments']['selector']) && !$compressed){
+		if (isset($rules['_comments']['selector']) && !$compressed) {
 			$output .= ' /* ' . implode(', ', $rules['_comments']['selector']) . ' */';
 		}
 		$output .= $n;
@@ -839,34 +819,34 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $output Formatted CSS
 	 */
-	private function glue_properties($rules, $prefix, $compressed){
+	private function glue_properties($rules, $prefix, $compressed) {
 		$output = '';
 		// Whitspace characters
 		$s = ' ';
 		$t = "\t";
 		$n = "\r\n";
 		// Forget the whitespace if we're compressing
-		if($compressed){
+		if ($compressed) {
 			$s = $t = $n = '';
 		}
 		// Keep count of the properties
 		$num_properties = $this->count_properties($rules);
 		$count_properties = 0;
 		// Build output
-		foreach($rules as $property => $values){
+		foreach ($rules as $property => $values) {
 			// Ignore empty properties (might happen because of errors in plugins) and non-content-properties
-			if(!empty($property) && $property{0} != '_'){
+			if (!empty($property) && $property{0} != '_') {
 				$count_properties++;
 				// Implode values
 				$value = $this->get_final_value($values, $property, $compressed);
 				// Output property line
 				$output .= $prefix . $t . $property . ':' . $s . $value;
 				// When compressing, omit the last semicolon
-				if(!$compressed || $num_properties != $count_properties){
+				if (!$compressed || $num_properties != $count_properties) {
 					$output .= ';';
 				}
 				// Add comments
-				if(isset($rules['_comments'][$property]) && !$compressed){
+				if (isset($rules['_comments'][$property]) && !$compressed) {
 					$output .= ' /* ' . implode(', ', $rules['_comments'][$property]) . ' */';
 				}
 				$output .= $n;
@@ -884,51 +864,45 @@ class Parser2 extends Base{
 	 * @param bool $compressed Compress CSS? (removes whitespace)
 	 * @return string $final The final value
 	 */
-	public function get_final_value($values, $property = NULL, $compressed = false){
+	public function get_final_value($values, $property = NULL, $compressed = false) {
 		// If there's only one value, there's only one thing to return
-		if(count($values) == 1){
+		if (count($values) == 1) {
 			$final = array_pop($values);
-		}
-		// Otherwise find the last and/or most !important value
-		else{
+		} else { // Otherwise find the last and/or most !important value
 			// Whitspace characters
 			$s = ' ';
 			// Forget the whitespace if we're compressing
-			if($compressed){
+			if ($compressed) {
 				$s = '';
 			}
 			// The final value
 			$final = '';
 			$num_values = count($values);
-			for($i = 0; $i < $num_values; $i++){
+			for($i = 0; $i < $num_values; $i++) {
 				// Tokenized properties
-				if(in_array($property, $this->tokenized_properties)){
-					if($final != ''){
+				if (in_array($property, $this->tokenized_properties)) {
+					if ($final != '') {
 						$final .= ' ';
 					}
 					// Remove quotes in values on quoted properties (important for -ms-filter property)
-					if(in_array($property, $this->quoted_properties)){
+					if (in_array($property, $this->quoted_properties)) {
 						$values[$i] = str_replace('"',"'",trim($values[$i],'"'));
 					}
 					$final .= $values[$i];
-				}
-				// Listed properties
-				elseif(in_array($property, $this->listed_properties)){
-					if($final != ''){
+				} elseif (in_array($property, $this->listed_properties)) { // Listed properties
+					if ($final != '') {
 						$final .= ','.$s;
 					}
 					$final .= $values[$i];
-				}
-				// Normal properties
-				else{
-					if(strpos($values[$i], '!important') || !strpos($final, '!important')){
+				} else { // Normal properties
+					if (strpos($values[$i], '!important') || !strpos($final, '!important')) {
 						$final = $values[$i];
 					}
 				}
 			}
 		}
 		// Add quotes to quoted properties
-		if(in_array($property, $this->quoted_properties)){
+		if (in_array($property, $this->quoted_properties)) {
 			$final = '"' . $final . '"';
 		}
 		return $final;
@@ -941,10 +915,10 @@ class Parser2 extends Base{
 	 * @param array $properties The rules containing the properties to count
 	 * @return int $count
 	 */
-	private function count_properties($properties){
+	private function count_properties($properties) {
 		$count = 0;
-		foreach($properties as $property => $value){
-			if($property{0} != '_'){
+		foreach ($properties as $property => $value) {
+			if ($property{0} != '_') {
 				$count++;
 			}
 		}
@@ -959,45 +933,43 @@ class Parser2 extends Base{
 	 * @param mixed $separator
 	 * @return array $tokens
 	 */
-	public function tokenize($str, $separator = array(' ', '	')){
+	public function tokenize($str, $separator = array(' ', '	')) {
 		$tokens = array();
 		$current = '';
 		$string_delimeters = array('"', "'", '(');
 		$current_string_delimeter = null;
-		if(!is_array($separator)){
+		if (!is_array($separator)) {
 			$separator = array($separator);
 		}
 		$strlen = strlen($str);
-		for($i = 0; $i < $strlen; $i++){
-			if($current_string_delimeter === null){
+		for($i = 0; $i < $strlen; $i++) {
+			if ($current_string_delimeter === null) {
 				// End current token
-				if(in_array($str{$i}, $separator)){
+				if (in_array($str{$i}, $separator)) {
 					$token = trim($current);
-					if(strlen($token) > 0 && !in_array($token, $separator)){
+					if (strlen($token) > 0 && !in_array($token, $separator)) {
 						$tokens[] = $token;
 					}
 					$current = '';
 					$i++;
-				}
-				// Begin string state
-				elseif(in_array($str{$i}, $string_delimeters)){
+				} elseif (in_array($str{$i}, $string_delimeters)) { // Begin string state
 					$current_string_delimeter = $str{$i};
 				}
 			}
 			else{
 				// End string state
-				if($str{$i} === $current_string_delimeter || ($current_string_delimeter == '(' && $str{$i} === ')')){
+				if ($str{$i} === $current_string_delimeter || ($current_string_delimeter == '(' && $str{$i} === ')')) {
 					$current_string_delimeter = null;
 				}
 			}
 			// Add to the current token
-			if(isset($str{$i})){
+			if (isset($str{$i})) {
 				$current .= $str{$i};
 			}
 			// Handle the last token
-			if($i == $strlen - 1){
+			if ($i == $strlen - 1) {
 				$lasttoken = trim($current);
-				if($lasttoken){
+				if ($lasttoken) {
 					$tokens[] = $lasttoken;
 				}
 			}
@@ -1014,14 +986,13 @@ class Parser2 extends Base{
 	 * @param string $comment
 	 * @return void
 	 */
-	public static function comment(&$item, $property = null, $comment){
-		if(!$property){
+	public static function comment(&$item, $property = null, $comment) {
+		if (!$property) {
 			$property = 'selector';
 		}
-		if(!isset($item['_comments'][$property])){
+		if (!isset($item['_comments'][$property])) {
 			$item['_comments'][$property] = array($comment);
-		}
-		else{
+		} else {
 			$item['_comments'][$property][] = $comment;
 		}
 	}
@@ -1032,7 +1003,7 @@ class Parser2 extends Base{
 	 * Resets the parser
 	 * @return void
 	 */
-	public function reset(){
+	public function reset() {
 		$this->code = array();
 		$this->parsed = array('global' =>
 			array(
